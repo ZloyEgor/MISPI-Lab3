@@ -1,40 +1,18 @@
 <?xml version="1.0"?>
-<project name="MISPI-Lab3" xmlns:ivy="antlib:org.apache.ivy.ant">
+<project name="MISPI-Lab3" default="compile">
 
     <property file="ant.properties"/>
 
-    <condition property="ivy.home" value="${env.IVY_HOME}">
-        <isset property="env.IVY_HOME"/>
-    </condition>
+    <path id="compile.path">
+        <fileset dir="lib/compile" includes="**/*.jar"/>
+    </path>
 
-    <target name="download-ivy" unless="offline">
-        <mkdir dir="${ivy.jar.dir}"/>
-        <get src="https://repo1.maven.org/maven2/org/apache/ivy/ivy/${ivy.install.version}/ivy-${ivy.install.version}.jar"
-             dest="${ivy.jar.file}"/>
-    </target>
+    <path id="test.path">
+        <fileset dir="lib/compile" includes="**/*.jar"/>
+        <fileset dir="lib/test" includes="**/*.jar"/>
+    </path>
 
-    <target name="init-ivy" depends="download-ivy">
-        <path id="ivy.lib.path">
-            <fileset dir="${ivy.jar.dir}" includes="*.jar"/>
-        </path>
-        <taskdef resource="org/apache/ivy/ant/antlib.xml"
-                 uri="antlib:org.apache.ivy.ant" classpathref="ivy.lib.path"/>
-    </target>
-
-    <target name="resolve" depends="init-ivy">
-        <ivy:resolve/>
-
-        <ivy:report todir="${ivy.report.dir}" graph="false" xml="false"/>
-        <ivy:cachepath pathid="compile.path" conf="compile"/>
-        <ivy:cachepath pathid="test.path" conf="test"/>
-    </target>
-
-    <target name="retrive" depends="resolve">
-        <ivy:retrieve sync="true" type="jar" pattern="${lib.dir}/[conf]/[artifact].[ext]"/>
-        <ivy:retrieve conf="compile" sync="true" type="jar" pattern="${web.lib.dir}/[artifact].[ext]"/>
-    </target>
-
-    <target name="compile" depends="retrive">
+    <target name="compile">
         <mkdir dir="${build.classes.main.dir}"/>
         <javac srcdir="${src.main.dir}"
                destdir="${build.classes.main.dir}"
@@ -61,6 +39,7 @@
         <jar destfile="${build.dir}/${ant.project.name}.jar">
             <fileset dir="${build.classes.main.dir}"/>
             <manifest>
+                <attribute name="Manifest-Version" value="1.0"/>
                 <attribute name="Main-Class" value="Main"/>
             </manifest>
         </jar>
@@ -72,7 +51,6 @@
         <delete dir="${web.classes.dir}"/>
         <delete dir="${web.lib.dir}"/>
         <delete dir="${docs.dir}"/>
-        <delete dir="${lib.dir}"/>
         <delete file="${war.file.name}"/>
     </target>
 
@@ -83,6 +61,14 @@
                 <include name="**/*.class"/>
             </fileset>
         </copy>
+
+        <mkdir dir="${web.lib.dir}"/>
+        <copy todir="${web.lib.dir}">
+            <fileset dir="${lib.dir}/compile">
+                <include name="**/*.jar"/>
+            </fileset>
+        </copy>
+
         <war warfile="${war.file.name}">
             <fileset dir="${web.dir}"/>
         </war>
