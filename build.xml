@@ -1,0 +1,142 @@
+<?xml version="1.0"?>
+<project name="MISPI-Lab3" xmlns:ivy="antlib:org.apache.ivy.ant">
+
+    <property file="ant.properties"/>
+
+    <condition property="ivy.home" value="${env.IVY_HOME}">
+        <isset property="env.IVY_HOME"/>
+    </condition>
+
+    <target name="download-ivy" unless="offline">
+        <mkdir dir="${ivy.jar.dir}"/>
+        <get src="https://repo1.maven.org/maven2/org/apache/ivy/ivy/${ivy.install.version}/ivy-${ivy.install.version}.jar"
+             dest="${ivy.jar.file}"/>
+    </target>
+
+    <target name="init-ivy" depends="download-ivy">
+        <path id="ivy.lib.path">
+            <fileset dir="${ivy.jar.dir}" includes="*.jar"/>
+        </path>
+        <taskdef resource="org/apache/ivy/ant/antlib.xml"
+                 uri="antlib:org.apache.ivy.ant" classpathref="ivy.lib.path"/>
+    </target>
+
+    <target name="resolve" depends="init-ivy">
+        <ivy:resolve/>
+
+        <ivy:report todir="${ivy.report.dir}" graph="false" xml="false"/>
+        <ivy:cachepath pathid="compile.path" conf="compile"/>
+        <ivy:cachepath pathid="test.path" conf="test"/>
+    </target>
+
+    <target name="retrive" depends="resolve">
+        <ivy:retrieve sync="true" type="jar" pattern="${lib.dir}/[conf]/[artifact].[ext]"/>
+        <ivy:retrieve conf="compile" sync="true" type="jar" pattern="${web.lib.dir}/[artifact].[ext]"/>
+    </target>
+
+    <target name="compile" depends="retrive">
+        <mkdir dir="${build.classes.main.dir}"/>
+        <javac srcdir="${src.main.dir}"
+               destdir="${build.classes.main.dir}"
+               includeantruntime="false">
+            <classpath>
+                <path refid="compile.path"/>
+            </classpath>
+        </javac>
+    </target>
+
+    <target name="compile-tests" depends="compile">
+        <mkdir dir="${build.classes.test.dir}"/>
+        <javac srcdir="${src.test.dir}"
+               destdir="${build.classes.test.dir}"
+               includeantruntime="false">
+            <classpath>
+                <path refid="test.path"/>
+                <pathelement location="${build.classes.main.dir}"/>
+            </classpath>
+        </javac>
+    </target>
+
+    <target name="build" depends="compile">
+        <jar destfile="${build.dir}/${ant.project.name}.jar">
+            <fileset dir="${build.classes.main.dir}"/>
+            <manifest>
+                <attribute name="Main-Class" value="Main"/>
+            </manifest>
+        </jar>
+    </target>
+
+    <target name="clean">
+        <echo>Deleting artifacts...</echo>
+        <delete dir="${build.dir}"/>
+        <delete dir="${web.classes.dir}"/>
+        <delete dir="${web.lib.dir}"/>
+        <delete dir="${docs.dir}"/>
+        <delete dir="${lib.dir}"/>
+        <delete file="${war.file.name}"/>
+    </target>
+
+    <target name="war" depends="compile">
+        <mkdir dir="${web.classes.dir}"/>
+        <copy todir="${web.classes.dir}">
+            <fileset dir="${build.classes.main.dir}">
+                <include name="**/*.class"/>
+            </fileset>
+        </copy>
+        <war warfile="${war.file.name}">
+            <fileset dir="${web.dir}"/>
+        </war>
+    </target>
+
+    <target name="deploy" depends="war">
+        <delete file="${jboss.deployment}/${war.file.name}}"/>
+        <delete file="${jboss.deployment}/${war.file.name.deployed}"/>
+        <copy file="./${war.file.name}" todir="${jboss.deployment}"/>
+    </target>
+
+    <target name="test" depends="build, compile-tests">
+        <junit printsummary="true" haltonfailure="true">
+            <classpath>
+                <path refid="test.path"/>
+                <pathelement location="${build.dir}"/>
+                <pathelement location="${build.classes.main.dir}"/>
+                <pathelement location="${build.classes.test.dir}"/>
+            </classpath>
+            <test name="AreaCheckerTest"/>
+            <formatter type="plain" usefile="false"/>
+        </junit>
+    </target>
+
+    <target name="doc" depends="build">
+        <mkdir dir="docs"/>
+        <signjar jar="${build.dir}/${ant.project.name}.jar"
+                 alias="ant_keystore"
+                 storepass="msc114"
+                 keystore="my-release-key.keystore"
+                 sigalg="MD5withRSA"
+                 digestalg="SHA1"/>
+        <javadoc
+                destdir="docs"
+                author="true"
+                version="true"
+                use="true">
+            <classpath>
+                <path refid="compile.path"/>
+            </classpath>
+            <fileset dir="${src.main.dir}"/>
+        </javadoc>
+        <jar destfile="${build.dir}/${ant.project.name}.jar"
+             basedir="docs"
+             update="true">
+        </jar>
+    </target>
+
+    <target name="env" depends="build">
+        <echo message="--- Executing: java ${params} -jar ${build.dir}/${jar.file.name} ---"/>
+        <exec executable="cmd">
+            <arg value="/c"/>
+            <arg value="java ${params} -jar ${build.dir}/${jar.file.name}"/>
+        </exec>
+    </target>
+
+</project>
